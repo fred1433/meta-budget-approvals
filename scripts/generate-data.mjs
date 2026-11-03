@@ -26,9 +26,9 @@ const REMEMBER = { title: 'Remember Who The F*ck You Are Crystal Boho Wrap Neckl
 
 const ADSETS = [
   { id: 'SIM-AS-101', name: 'Crystal Cross, prospecting', campaign_id: 'SIM-C-10', campaign_name: 'Prospecting (simulated)', library_id: '2054044151911791', daily_budget_cents: 10000,
-    cpm: 2400, ctr: [0.0162, 0.0158], cvr: 0.044, newShare: 0.68, spendF: () => between(0.93, 1.06), basket: () => [CROSS] },
+    cpm: 2400, ctr: [0.0162, 0.0158], cvr: 0.052, newShare: 0.76, spendF: () => between(0.93, 1.06), basket: () => [CROSS] },
   { id: 'SIM-AS-102', name: 'BOGO Boho Wraps, broad', campaign_id: 'SIM-C-11', campaign_name: 'Offers (simulated)', library_id: '941661894938227', daily_budget_cents: 15000,
-    cpm: 1900, ctr: [0.0192, 0.0186], cvr: 0.040, newShare: 0.36, spendF: () => between(0.94, 1.04), basket: () => { const a = pick(WRAPS), b = pick(WRAPS); return [a, b]; }, bogo: true },
+    cpm: 1900, ctr: [0.0192, 0.0186], cvr: 0.040, newShare: 0.32, spendF: () => between(0.94, 1.04), basket: () => { const a = pick(WRAPS), b = pick(WRAPS); return [a, b]; }, bogo: true },
   { id: 'SIM-AS-103', name: 'Inner Light video', campaign_id: 'SIM-C-10', campaign_name: 'Prospecting (simulated)', library_id: '1655236699580259', daily_budget_cents: 8000,
     cpm: 2050, ctr: [0.0148, 0.0084], cvr: 0.050, newShare: 0.52, spendF: () => between(0.95, 1.03), basket: () => [REMEMBER], hook: [0.335, 0.205] },
 ];
@@ -55,13 +55,33 @@ function makeOrder({ adset, clickMs, orderMs, lastSource, isNew, lines, bogo }) 
   return o;
 }
 
+// Meta: spending in a calendar week (ending Saturday at midnight) never exceeds 7 x the daily budget.
+// Each week's spend is scaled under that cap, keeping the one deliberate day above budget.
+const weekStart = (d) => { const t = Date.parse(d + 'T12:00:00Z'); return new Date(t - new Date(t).getUTCDay() * 86400000).toISOString().slice(0, 10); };
+const spendPlan = {};
+for (const a of ADSETS) {
+  const f = DAYS.map((d) => (a.id === 'SIM-AS-101' && d === '2026-10-31' ? 1.38 : a.spendF()));
+  const groups = {};
+  DAYS.forEach((d, i) => { (groups[weekStart(d)] ??= []).push(i); });
+  for (const idx of Object.values(groups)) {
+    const cap = 7 * 0.985;
+    const sum = idx.reduce((s, i) => s + f[i], 0);
+    if (sum <= cap) continue;
+    const fixed = idx.filter((i) => f[i] > 1.3);
+    const free = idx.filter((i) => f[i] <= 1.3);
+    const fixedSum = fixed.reduce((s, i) => s + f[i], 0);
+    const freeSum = free.reduce((s, i) => s + f[i], 0);
+    for (const i of free) f[i] *= (cap - fixedSum) / freeSum;
+  }
+  spendPlan[a.id] = f;
+}
+
 for (const a of ADSETS) {
   DAYS.forEach((d, i) => {
     const t = i / (DAYS.length - 1);
     const lateCpm = d >= '2026-11-01' ? 1.18 : 1;
-    let f = a.spendF();
-    if (a.id === 'SIM-AS-101' && d === '2026-10-31') f = 1.38; // a day above budget, inside Meta's daily flexibility
-    const spend = Math.round(a.daily_budget_cents * f);
+    const f = spendPlan[a.id][i]; // Oct 31 on SIM-AS-101: above budget, inside Meta's 75% daily flexibility
+    const spend = Math.floor(a.daily_budget_cents * f);
     const cpm = a.cpm * lateCpm * between(0.97, 1.03);
     const impressions = Math.round((spend / cpm) * 1000);
     const ctr = a.ctr[0] + (a.ctr[1] - a.ctr[0]) * t;
@@ -74,7 +94,7 @@ for (const a of ADSETS) {
     for (let k = 0; k < n; k++) {
       const clickMs = localToUtc(d, 8 + Math.floor(rnd() * 14), Math.floor(rnd() * 60));
       const lagMs = rnd() < 0.8 ? between(5, 90) * 60000 : between(20, 120) * 3600000;
-      makeOrder({ adset: a, clickMs, orderMs: clickMs + lagMs, lastSource: rnd() < 0.85 ? 'meta' : pick(['email', 'direct']), isNew: rnd() < a.newShare, lines: a.basket(), bogo: a.bogo });
+      makeOrder({ adset: a, clickMs, orderMs: clickMs + lagMs, lastSource: rnd() < 0.8 ? 'meta' : pick(['email', 'direct']), isNew: rnd() < a.newShare, lines: a.basket(), bogo: a.bogo });
     }
     // Engage-through and 1-day view conversions Meta will report for this ad set.
     const ne = Math.round(n * (a.bogo ? 0.32 : 0.18) * between(0.8, 1.2));
@@ -159,10 +179,12 @@ const DATA = {
     reads: { meta_insights_utc: iso(localToUtc('2026-11-03', 7, 42)), shopify_orders_utc: iso(localToUtc('2026-11-03', 7, 45)), shopify_attribution_utc: iso(localToUtc('2026-11-03', 7, 45)) },
     week: { from: WEEK[0], to: WEEK[WEEK.length - 1] },
     attribution_setting: { click: '7-day link click', engage_through: '1-day engage-through', view: '1-day view', action_report_time: 'impression' },
+    sync: { meta: { complete_through: '2026-11-02', note: 'declared complete in the simulation' }, shopify: { complete_through: '2026-11-02', note: 'declared complete in the simulation' } },
     targets: { new_customer_cost_cents: 5500, cost_per_purchase_cents: 5000 },
   },
   adsets: ADSETS.map(({ id, name, campaign_id, campaign_name, library_id, daily_budget_cents }) => ({
     id, name, campaign_id, campaign_name, library_id, daily_budget_cents, budget_level: 'ad set', effective_status: 'ACTIVE',
+    launch_date: { '2054044151911791': '2026-10-14', '941661894938227': '2026-08-26', '1655236699580259': '2026-10-18' }[library_id], // public Ad Library start dates
     updated_utc: iso(localToUtc('2026-10-24', 10, 0)),
   })),
   daily, reach: reachRows, orders: known, returns, meta_extra: extraKnown, meta_unmatched: unmatched, hourly_spend: { adset_id: 'SIM-AS-101', rows: hourly },

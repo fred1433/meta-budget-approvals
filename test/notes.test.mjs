@@ -26,6 +26,10 @@ const BAD = [
   ['The cost per purchase is $46, under target.', 'suspected_review'], // currency and digits
   ['Twice as many people saw it.', 'suspected_review'], // number word at start
   ['This buyer, Catherine, returned an item.', 'hold'], // name in commas
+  ['New buyers arrive cheaply and the budget is the limit.', 'increase'], // causal overreach
+  ['More budget here mostly buys repeat orders.', 'hold'], // causal overreach
+  ['Costs rose, so this is the auction, not this video.', 'suspected_review'], // causal overreach
+  ['Sales dropped due to the creative.', 'suspected_review'], // causal overreach
 ];
 for (const [text, verdict] of BAD) {
   test(`rejects: ${text}`, () => {

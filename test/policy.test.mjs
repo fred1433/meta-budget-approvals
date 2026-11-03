@@ -4,7 +4,7 @@ import { createWorld } from '../engine/world.js';
 import { evaluateFatigue } from '../engine/policy.js';
 import { DATA } from '../engine/syntheticData.js';
 import { SNAPSHOT } from '../engine/publicSnapshot.js';
-import { periodMetrics } from '../engine/metrics.js';
+import { periodMetrics, completeDays } from '../engine/metrics.js';
 
 test('Crystal Cross ad set: increase 100 to 110, every condition met', () => {
   const p = createWorld().propose('SIM-AS-101');
@@ -60,4 +60,18 @@ test('no synthetic order is dated after the scenario clock', () => {
 test('scenario assumes no budget sharing and budgets on ad sets', () => {
   assert.equal(DATA.account.budget_sharing, false);
   assert.ok(DATA.adsets.every((a) => a.budget_level === 'ad set'));
+});
+
+test('completeness counts distinct dates per ad set and needs every ad set and both syncs', () => {
+  assert.equal(completeDays().length, 7);
+  const dup = { ...DATA, daily: [...DATA.daily, { ...DATA.daily.find((r) => r.adset_id === 'SIM-AS-101' && r.date === '2026-10-30') }] };
+  assert.equal(periodMetrics('SIM-AS-101', '2026-10-27', '2026-11-02', dup).days, 7, 'a duplicated date is not an extra day');
+  const missing = { ...DATA, daily: DATA.daily.filter((r) => !(r.adset_id === 'SIM-AS-103' && r.date === '2026-10-29')) };
+  assert.equal(completeDays(missing).length, 6, 'one ad set without a row that day makes the day incomplete');
+  const lag = { ...DATA, scenario: { ...DATA.scenario, sync: { ...DATA.scenario.sync, shopify: { complete_through: '2026-11-01' } } } };
+  assert.equal(completeDays(lag).length, 6, 'Shopify sync behind by a day');
+});
+
+test('fatigue: the ad\u2019s first week is flagged as possibly still in learning', () => {
+  assert.ok(evaluateFatigue('SIM-AS-103').against.some((x) => /may still have been in learning/.test(x)));
 });

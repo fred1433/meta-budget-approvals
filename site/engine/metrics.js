@@ -27,14 +27,15 @@ export function periodMetrics(adsetId, from, to, data = DATA) {
   };
   meta.total = { n: meta.click.n + meta.engage.n + meta.view.n, value: meta.click.value + meta.engage.value + meta.view.value };
 
-  // Shopify orders whose journey includes a link click from this ad set, dated on the order.
+  // Shopify orders whose journey includes a link click from this ad set (first or last visit), dated on the order.
+  // This is wider than Shopify's own last non-direct click credit used in reconcile.js.
   const linked = data.orders.filter((o) => (o.journey.first.utm_content === adsetId || o.journey.last.utm_content === adsetId) && inRange(localDate(Date.parse(o.created_utc)), from, to));
   const newOrders = linked.filter((o) => o.customerOrderIndex === 1);
   const discounted = linked.filter((o) => o.discount_cents > 0);
 
   return {
     adsetId, from, to,
-    days: rows.length, daysExpected: datesBetween(from, to).length,
+    days: new Set(rows.map((r) => r.date)).size, daysExpected: datesBetween(from, to).length,
     spend, impressions, linkClicks,
     linkCtr: impressions ? linkClicks / impressions : null,
     cpm: impressions ? (spend / impressions) * 1000 : null,
@@ -53,11 +54,21 @@ export function periodMetrics(adsetId, from, to, data = DATA) {
   };
 }
 
+// A date is complete when every ad set has a spend row for it AND both sources declare their sync
+// complete through that date. A day without orders can be complete.
+export function completeDays(data = DATA) {
+  const { from, to } = data.scenario.week;
+  const sync = data.scenario.sync;
+  return datesBetween(from, to).filter((d) =>
+    data.adsets.every((a) => data.daily.some((r) => r.adset_id === a.id && r.date === d)) &&
+    sync.meta.complete_through >= d && sync.shopify.complete_through >= d);
+}
+
 export function dataStatusFromScenario(data = DATA) {
   return {
     metaReadMs: Date.parse(data.scenario.reads.meta_insights_utc),
     shopifyReadMs: Date.parse(data.scenario.reads.shopify_orders_utc),
-    daysComplete: datesBetween(data.scenario.week.from, data.scenario.week.to).filter((d) => data.daily.some((r) => r.date === d)).length,
+    daysComplete: completeDays(data).length,
     daysExpected: datesBetween(data.scenario.week.from, data.scenario.week.to).length,
   };
 }

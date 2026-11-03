@@ -2,7 +2,7 @@
 import { createWorld } from './world.js';
 
 const A = 'SIM-AS-101';
-const C = 'SIM-AS-103';
+const B = 'SIM-AS-102';
 
 function base(opts) {
   const w = createWorld(opts);
@@ -51,7 +51,7 @@ export const SCENARIOS = [
     run() {
       const { w, p } = base();
       const a = w.executor.approve(p); w.advance(60);
-      w.status.daysComplete = 6; // the Nov 2 order sync is found incomplete before sending
+      w.status.daysComplete = 6; w.status.incompleteReason = 'the Shopify order sync for Nov 2 is found incomplete'; // discovered before sending
       const r = w.executor.execute(a.id);
       return finish(w, { outcome: r.outcome });
     },
@@ -77,23 +77,25 @@ export const SCENARIOS = [
       const a1 = w.executor.approve(p); w.advance(5); const r1 = w.executor.execute(a1.id);
       w.advance(15 * 60);
       // A second rule proposes another +10% step from $110. Each step alone is within the +10% step limit.
-      const p2 = { ...p, id: 'P-SIM-AS-101-b', fromCents: 11000, toCents: 12100 };
+      const read = w.adapter.read(A);
+      const p2 = { ...p, id: 'P-SIM-AS-101-b', fromCents: 11000, toCents: 12100, observedUpdatedMs: read.updatedMs };
       w.executor.recommend(p2); w.advance(10);
       const a2 = w.executor.approve(p2); w.advance(5); const r2 = w.executor.execute(a2.id);
       return finish(w, { outcomes: [r1.outcome, r2.outcome], second: [p2.fromCents, p2.toCents] });
     },
   },
   {
-    id: 'stop-in-flight', title: 'You stop the agent while a request is in flight',
-    expect: 'No new sends; the in-flight one stays uncertain until verified.',
+    id: 'stop-in-flight', title: 'You stop the agent after a response was lost',
+    expect: 'No new sends; the unanswered request stays uncertain until verified.',
     run() {
       const { w, p } = base();
       const a = w.executor.approve(p); w.advance(5);
       w.sim.faults.loseNextResponse = true;
       const r1 = w.executor.execute(a.id); w.advance(3);
       w.executor.stop(); w.advance(20);
-      const pc = w.propose(C);
-      const other = { ...pc, toCents: Math.round(pc.fromCents * 1.1), id: 'P-SIM-AS-103-step' };
+      // Another change waiting: lowering the BOGO ad set to $135, a change you asked for. Stopped writes block it too.
+      const rb = w.adapter.read(B);
+      const other = { id: 'P-SIM-AS-102-down', kind: 'decrease', objectId: B, objectName: 'BOGO Boho Wraps, broad', fromCents: rb.dailyBudget, toCents: 13500, observedUpdatedMs: rb.updatedMs };
       w.executor.recommend(other); w.advance(5);
       const a2 = w.executor.approve(other); w.advance(5);
       const r2 = w.executor.execute(a2.id); w.advance(30);
@@ -108,7 +110,7 @@ export const SCENARIOS = [
       const { w, p } = base();
       const a = w.executor.approve(p); w.advance(5); w.executor.execute(a.id); w.advance(120);
       const back = w.executor.revertProposal(a.id);
-      w.executor.recommend(back); w.advance(10);
+      w.executor.recommend(back); w.executor.log('recommendation', back.note, back.id); w.advance(10);
       const b = w.executor.approve(back); w.advance(5);
       const r = w.executor.execute(b.id);
       return finish(w, { outcome: r.outcome, newAuth: b.id !== a.id, note: back.note });

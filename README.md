@@ -29,7 +29,7 @@ Node 20 or later, no dependencies.
 ## Layout
 
 - `engine/executor.js`: authorization, idempotency, expiry, re-read before sending, data checks, daily cap, stop switch, verification after a lost response, read-back after the change, going back as a new change.
-- `engine/metaAdapter.js`: prepares `GET /{id}?fields=daily_budget,...` and `POST /{id}` with `daily_budget` in cents for Marketing API v25.0; refuses a budget on an ad. `execution_options=["validate_only"]` can be added to a prepared request; nothing in this repository sends it to Meta.
+- `engine/metaAdapter.js`: prepares `GET /{id}?fields=daily_budget,...` and `POST /{id}` with `daily_budget` in cents for Marketing API v26.0; refuses a budget on an ad. `execution_options=["validate_only"]` can be added to a prepared request; nothing in this repository sends it to Meta.
 - `engine/simulator.js`: the local simulator, with a fault switch that drops the response after applying a write, and a "person edits in Ads Manager" call.
 - `engine/policy.js`: the three calls in the morning report (an increase under conditions, a hold despite a good Meta ROAS, a suspected fatigue that asks for review).
 - `engine/reconcile.js`: Meta and Shopify read separately, the gap split into explained lines and an unexplained remainder.
@@ -42,16 +42,23 @@ Node 20 or later, no dependencies.
 |---|---|---|
 | Approve twice, run twice | one authorization, one request | `two clicks on the same approval` |
 | Budget edited after approval | approval void, nothing sent | `budget edited after approval` |
+| A person goes 100 to 130 to 100 after approval | void anyway: any edit after the recommendation counts | `A-B-A` |
+| Approve after a person edited the budget | nothing approved; recommendation recalculated from the current budget | `approving after a person edited` |
 | Approval older than 30 minutes | expired, new approval needed | `expired approval` |
 | Data stale or incomplete | increase held with its reason | `stale or incomplete data`, `stale Meta read` |
 | Response lost after sending | result unknown, verified before any retry | `response lost after sending`, `lost response that did NOT apply` |
+| Response lost, then a person sets 100 again | cannot be told; void, no retry without a new approval | `lost response, then a person resets 100` |
+| New write while an earlier one is unresolved | blocked until verified | `no new write to an ad set that has an unresolved request` |
 | Two admissible +10% steps | second refused by the internal +20% per day cap | `several admissible increases` |
-| Stop while a request is in flight | no new sends, in-flight stays uncertain until verified | `stop = no new sends` |
+| Stop after a response was lost | no new sends, the unanswered request stays uncertain until verified | `stop = no new sends` |
 | Go back to $100 after it ran | a new change with its own approval | `going back to $100`, `going back is refused if someone edited` |
 
 Assumptions stated in the data: no budget sharing between ad sets; budgets on ad sets; account
 time zone America/New_York (Nov 1, 2026 has 25 hours there, and the tests cut days locally);
-Meta may spend up to 75% over a daily budget on a given day, so a daily budget is never presented
-as a spending guarantee.
+Meta may spend up to 75% over a daily budget on a given day but not more than 7 times it in a
+calendar week, and the simulated spend respects both (tested). The +20% per day is an internal
+rule on the agent's changes, not a spending cap. Shopify credit follows the last non-direct
+click: a direct visit never takes the credit from Meta (tested). Data completeness is counted in
+distinct dates per ad set, with each source's sync declared complete in the simulation.
 
 Frederic de Lavenne de Choulot, https://cal.theaipipe.com

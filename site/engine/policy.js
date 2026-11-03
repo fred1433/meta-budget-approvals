@@ -2,7 +2,7 @@
 import { periodMetrics, adset } from './metrics.js';
 import { DATA } from './syntheticData.js';
 import { usd, pct } from './money.js';
-import { clockLabel, dayLabel } from './time.js';
+import { clockLabel, dayLabel, localDate, datesBetween } from './time.js';
 
 export const RULES = {
   stepPct: 10,
@@ -20,19 +20,21 @@ export function evaluateScale(adsetId, { now, budgetRead, dataStatus, data = DAT
   const target = data.scenario.targets.new_customer_cost_cents;
   const budget = budgetRead.dailyBudget;
   const hoursSinceEdit = (now - budgetRead.updatedMs) / 3600000;
+  const calDays = datesBetween(localDate(budgetRead.updatedMs), localDate(now)).length - 1;
+  const editedText = calDays === 0 ? 'today' : calDays === 1 ? 'yesterday' : `${calDays} days ago`;
   const c = [
-    { id: 'complete', ok: m.days === m.daysExpected, text: `${m.days} of ${m.daysExpected} days have spend and orders` },
+    { id: 'complete', ok: m.days === m.daysExpected && dataStatus.daysComplete === dataStatus.daysExpected, text: `${Math.min(m.days, dataStatus.daysComplete)} of ${m.daysExpected} days complete for spend and orders (sync declared complete in the simulation)` },
     { id: 'fresh', ok: now - dataStatus.metaReadMs <= 6 * 3600e3 && now - dataStatus.shopifyReadMs <= 2 * 3600e3, text: `Meta read ${clockLabel(dataStatus.metaReadMs)}, Shopify read ${clockLabel(dataStatus.shopifyReadMs)}` },
-    { id: 'new_customer_cost', ok: m.newCustomerCost != null && m.newCustomerCost <= target, text: `new-customer cost ${m.newCustomerCost == null ? 'unknown' : usd(m.newCustomerCost)} against your ${usd(target)} target` },
-    { id: 'volume', ok: m.shopify.newCustomers >= RULES.minNewCustomers, text: `${m.shopify.newCustomers} first orders (minimum ${RULES.minNewCustomers})` },
-    { id: 'budget_limited', ok: m.spend >= RULES.budgetLimitedShare * budget * 7, text: `spent ${usd(m.spend)} of ${usd(budget * 7)} budgeted this week` },
-    { id: 'no_recent_edit', ok: hoursSinceEdit >= RULES.noEditHours, text: `budget last edited ${Math.floor(hoursSinceEdit / 24)} days ago` },
+    { id: 'new_customer_cost', ok: m.newCustomerCost != null && m.newCustomerCost <= target, text: `new-customer cost ${m.newCustomerCost == null ? 'unknown' : usd(m.newCustomerCost)} against the simulated ${usd(target, { whole: true })} new-customer target` },
+    { id: 'volume', ok: m.shopify.newCustomers >= RULES.minNewCustomers, text: `${m.shopify.newCustomers} first orders among orders whose journey includes this ad set (minimum ${RULES.minNewCustomers})` },
+    { id: 'budget_limited', ok: m.spend >= RULES.budgetLimitedShare * budget * 7, text: `budget almost fully used: ${usd(m.spend)} spent over the last 7 days, at least 90% of 7 \u00d7 ${usd(budget)}` },
+    { id: 'no_recent_edit', ok: hoursSinceEdit >= RULES.noEditHours, text: `budget last edited ${editedText} (rule: not in the last ${RULES.noEditHours} hours)` },
   ];
   const verdict = c.every((x) => x.ok) ? 'increase' : 'hold';
   const toCents = Math.round((budget * (100 + RULES.stepPct)) / 100);
   return {
     id: `P-${adsetId}`, kind: verdict === 'increase' ? 'increase' : 'hold', verdict, adsetId,
-    objectId: adsetId, objectName: a.name, fromCents: budget, toCents: verdict === 'increase' ? toCents : budget,
+    objectId: adsetId, objectName: a.name, fromCents: budget, toCents: verdict === 'increase' ? toCents : budget, observedUpdatedMs: budgetRead.updatedMs,
     conditions: c, metrics: m, target,
   };
 }
@@ -62,9 +64,11 @@ export function evaluateFatigue(adsetId, data = DATA) {
   if (ev.hookRate.change != null && ev.hookRate.change <= -F.hookDown) forList.push(`3-second hook rate ${pct(ev.hookRate.p1)} to ${pct(ev.hookRate.p2)} (down ${pct(-ev.hookRate.change, 0)})`);
   const against = [];
   const cppTarget = data.scenario.targets.cost_per_purchase_cents;
-  if (ev.costPerPurchase.p2 <= cppTarget) against.push(`cost per Meta-reported purchase ${usd(ev.costPerPurchase.p2)}, still under your ${usd(cppTarget)} target`);
+  if (ev.costPerPurchase.p2 <= cppTarget) against.push(`cost per Meta-reported purchase ${usd(ev.costPerPurchase.p2)}, still under the simulated ${usd(cppTarget, { whole: true })} cost-per-purchase target`);
   const auctionWide = others.every((o) => o.cpmChange > 0.02) && ev.cpm.change > 0.02;
-  if (auctionWide) against.push(`CPM rose on every ad set (up ${pct(ev.cpm.change, 0)} here, ${others.map((o) => pct(o.cpmChange, 0)).join(' and ')} on the others), so part of the cost change is the auction, not this video`);
+  if (auctionWide) against.push(`CPM rose on every ad set (up ${pct(ev.cpm.change, 0)} here, ${others.map((o) => pct(o.cpmChange, 0)).join(' and ')} on the others), which points to auction pressure as one possible cause`);
+  const launch = data.adsets.find((x) => x.id === adsetId).launch_date;
+  if (launch && datesBetween(launch, p1.to).length <= 10) against.push(`the first period is the ad\u2019s first full week (it started ${dayLabel(launch)}) and may still have been in learning`);
   const purchaseLevel = p2.meta.total.n < F.minPurchases ? 'insufficient' : 'enough';
   if (purchaseLevel === 'insufficient') against.push(`${p1.meta.total.n} and ${p2.meta.total.n} purchases: too few to call fatigue on purchases alone`);
   const verdict = forList.length >= 2 ? 'suspected_review' : 'no_signal';

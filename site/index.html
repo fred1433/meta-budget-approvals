@@ -16,7 +16,7 @@
 </head>
 <body>
 <header class="masthead">
-  <p class="for">For Katia Designs: a Meta agent that asks before it spends</p>
+  <p class="for">For Katia Designs: a Meta agent that asks before changing budgets</p>
   <p class="by">Built Nov 3, 2026 by Frederic de Lavenne de Choulot</p>
 </header>
 
@@ -24,48 +24,56 @@
 <section class="stage" aria-labelledby="h1">
   <div class="intro">
     <h1 id="h1">Approve a budget change, then change the budget yourself.</h1>
-    <p class="lede">Before it sends anything, the agent reads the account again. If your approval no longer describes what it finds, it refuses and says why. Try it on a simulated ad set built around your Crystal Cross ad; it takes about a minute, or <a href="#film">watch the same run</a>.</p>
+    <p class="lede">Before sending anything, the agent reads the account again. If your approval no longer matches it, it refuses and says why. <span class="wide">Try it on a simulated ad set built around your Crystal Cross ad, or </span><span class="narrow">Try it below, or </span><a href="#film">watch the same run</a>.</p>
   </div>
 
-  <p class="truthline" aria-label="What is real on this page"><span><span class="mk mk-real" aria-hidden="true"></span><b>Real:</b> your public ads and catalog availability, each with source and time.</span> <span><span class="mk mk-sim" aria-hidden="true"></span><b>Simulated:</b> spend, orders, customers, targets, account structure.</span> <span><span class="mk mk-code" aria-hidden="true"></span><b>Executed code:</b> rules, approvals, journal.</span> <span><span class="mk mk-none" aria-hidden="true"></span><b>Not shown:</b> a connection to your ad account, or this agent deployed for another client; neither exists yet.</span></p>
+  <p class="truthline" aria-label="What is real on this page"><span><span class="mk mk-real" aria-hidden="true"></span><b>Real:</b> your public ads and catalog availability, each with source and time.</span> <span><span class="mk mk-sim" aria-hidden="true"></span><b>Simulated:</b> spend, orders, customers, targets, account structure.</span> <span><span class="mk mk-code" aria-hidden="true"></span><b>Executed code:</b> rules, approvals, journal. <i>Italic notes</i> were drafted offline by a language model, frozen, and checked to hold no figures or names.</span> <span><span class="mk mk-none" aria-hidden="true"></span><b>Not shown:</b> a connection to your ad account, or this agent deployed for another client; neither exists yet.</span></p>
 
   <div class="bench">
-    <article class="piece" aria-label="The ad and the ad set">
-      <figure class="ad">
-        <img src="img/crystal-cross.jpg" width="600" height="600" alt="Two crystal cross pendants engraved LOVE and TRUST on silver and gold chunky chains">
-        <figcaption><span class="mk mk-real" aria-hidden="true"></span>Your ad <q>FINALLY HERE: THE LIMITED-EDITION CRYSTAL CROSS</q>, Library ID 2054044151911791, running since Oct 14. <span class="src">Meta Ad Library, collected Nov 3, 2026, 12:47 UTC.</span></figcaption>
-      </figure>
-      <div class="adset">
-        <h2><span class="mk mk-sim" aria-hidden="true"></span><span id="adsetName">Crystal Cross, prospecting</span></h2>
-        <p class="sub">Simulated ad set, budget on the ad set, no budget sharing. Week of <span id="weekLabel"></span>.</p>
+    <figure class="ad adfig">
+      <img src="img/crystal-cross.jpg" width="600" height="600" alt="Two crystal cross pendants engraved LOVE and TRUST on silver and gold chunky chains">
+      <figcaption><span class="mk mk-real" aria-hidden="true"></span>Your ad <q>FINALLY HERE: THE LIMITED-EDITION CRYSTAL CROSS</q>, Library ID 2054044151911791, running since Oct 14. <span class="src">Meta Ad Library, collected Nov 3, 2026, 07:47 ET (12:47 UTC).</span></figcaption>
+    </figure>
+
+    <div class="adset">
+      <h2><span class="mk mk-sim" aria-hidden="true"></span><span id="adsetName">Crystal Cross, prospecting</span></h2>
+      <p class="sub">Simulated ad set, budget on the ad set, no budget sharing. Week of <span id="weekLabel"></span>.</p>
+      <details class="why" id="why" open>
+        <summary id="whySum">Conditions read now</summary>
         <ul class="checks" id="checks"></ul>
         <p class="note" id="note101"></p>
-      </div>
-    </article>
+      </details>
+    </div>
 
-    <div class="tagcol">
+    <div class="tagwrap">
       <div class="tag" id="tag" data-state="proposed" aria-live="polite">
         <div class="string" aria-hidden="true"></div>
         <div class="hole" aria-hidden="true"></div>
+        <img class="tagthumb" src="img/crystal-cross.jpg" width="600" height="600" alt="">
         <p class="tag-id" id="tagId">Recommendation, waiting for your approval</p>
         <p class="tag-obj">Daily budget, <span id="tagObj">Crystal Cross, prospecting</span></p>
-        <p class="tag-val"><span id="tagFrom">$100.00</span><span class="to" aria-label="to">to</span><span id="tagTo">$110.00</span></p>
+        <p class="tag-val"><span id="tagFrom">$100.00</span><span class="to" id="tagToWord">to</span><span id="tagTo">$110.00</span></p>
         <ul class="tag-cond" id="tagCond"></ul>
         <p class="tag-sign" id="tagSign">Not approved yet</p>
         <p class="stamp" id="stamp" hidden></p>
       </div>
+    </div>
 
+    <div class="controls">
+      <p class="replaynote" id="replayNote" hidden>Replay: the same morning, and nobody touches the budget this time.</p>
       <ol class="steps" id="steps">
-        <li><button class="btn primary" id="btnApprove" type="button">Approve $100 to $110</button><span class="hint">Twice if you like: it stays one authorization.</span></li>
-        <li><button class="btn" id="btnEdit" type="button">Set it to $130 in Ads Manager</button><span class="hint">A person's edit, made in the simulator.</span></li>
-        <li><button class="btn" id="btnRun" type="button">Run the approved change</button><span class="hint">Reads the budget, then sends or refuses.</span></li>
+        <li id="stepApprove"><button class="btn" id="btnApprove" type="button">Approve $100 to $110</button><span class="hint">Twice if you like: it stays one authorization.</span></li>
+        <li id="stepEdit"><button class="btn" id="btnEdit" type="button">Set it to $130 in Ads Manager</button><span class="hint">A person's edit, made in the simulator.</span></li>
+        <li id="stepRun"><button class="btn" id="btnRun" type="button">Run the approved change</button><span class="hint">Reads the budget, then sends or refuses.</span></li>
       </ol>
-      <div class="after" id="after">
+      <div class="after">
         <button class="btn quiet" id="btnReplay" type="button">Replay without the edit</button>
         <button class="btn quiet" id="btnBack" type="button" hidden>Go back to $100</button>
         <label class="kill"><input type="checkbox" id="kill" role="switch"><span class="track" aria-hidden="true"></span><span class="kill-label">Stop agent writes</span></label>
       </div>
       <p class="killnote">Stopping blocks the agent's writes only. Reads go on and your ads keep running as they are.</p>
+      <p class="fine budgetline">A daily budget is an average: Meta may spend up to 75% more on a given day, but no more than seven times it in a calendar week (<a href="https://www.facebook.com/business/help/190490051321426" rel="noopener">Meta help</a>). The +20% is an internal limit on the agent's changes, not a spending cap.</p>
+      <p class="cal">Want to see how this would sit on your account? <a href="https://cal.theaipipe.com" rel="noopener">Fifteen minutes on cal.theaipipe.com</a></p>
     </div>
 
     <aside class="journal" aria-label="Journal">
@@ -75,7 +83,7 @@
       <details class="req">
         <summary>The request it prepares</summary>
         <pre id="reqPre"></pre>
-        <p>Marketing API v25.0. In this demo the request goes to a local simulator; every response is marked simulated. Nothing reaches your account.</p>
+        <p>Marketing API v26.0. In this demo the request goes to a local simulator; every response is marked simulated. Nothing reaches your account.</p>
       </details>
     </aside>
   </div>
@@ -83,7 +91,7 @@
 
 <section class="morning" aria-labelledby="h2m">
   <h2 id="h2m" class="sec">The other two calls in this morning's report</h2>
-  <p class="sec-sub">Report run Nov 3 at 07:50 New York time on the simulated week of Oct 27 to Nov 2. Each call is computed from the data; nothing is decided by text.</p>
+  <p class="sec-sub">Report run Nov 3 at 07:50 New York time on the simulated week of Oct 27 to Nov 2. Each call is computed from the data; nothing is decided by text. The rules use two simulated targets: $55 per new customer and $50 per purchase.</p>
 
   <div class="calls">
     <article class="call" id="callHold">
@@ -95,7 +103,7 @@
         <p class="note" id="note102"></p>
         </div><div class="cb-side">
         <div class="public">
-          <p><span class="mk mk-real" aria-hidden="true"></span>On Nov 3 at 12:49 UTC, the collection this ad links to, <a href="https://katiadesigns.com/collections/boho-wrap" rel="noopener">/collections/boho-wrap</a>, showed <strong>20 of 62 variants unavailable</strong> across 16 products; one product, Believe Heart Crystal Boho Wrap Bracelet/Necklace, had none available.</p>
+          <p><span class="mk mk-real" aria-hidden="true"></span>On Nov 3 at 07:49 ET (12:49 UTC), the collection this ad links to, <a href="https://katiadesigns.com/collections/boho-wrap" rel="noopener">/collections/boho-wrap</a>, showed <strong>20 of 62 variants unavailable</strong> across 16 products; one product, Believe Heart Crystal Boho Wrap Bracelet/Necklace, had none available.</p>
           <p>Suggested check: the selection featured at the top of that page. The public feed shows availability only, not quantities, so no loss is estimated.</p>
         </div>
       </div></div>
@@ -131,7 +139,7 @@
       <h4>One synthetic customer, four events</h4>
       <ol class="timeline" id="timeline"></ol>
     </div>
-    <p class="fine">Meta's attribution changed in March 2026: click-through now counts link clicks only, and shares, saves and other engagements moved to engage-through (<a href="https://about.fb.com/ltam/news/2026/03/simplificando-la-medicion-de-anuncios-para-un-mundo-social-first/" rel="noopener">Meta announcement</a>). The setting above is the simulated account's; nothing here says how your account is configured. Your ads' URL parameters are not visible publicly, so the UTM links in this data are an assumption too.</p>
+    <p class="fine">Meta's attribution changed in March 2026: click-through now counts link clicks only, and shares, saves and other engagements moved to engage-through (<a href="https://about.fb.com/ltam/news/2026/03/simplificando-la-medicion-de-anuncios-para-un-mundo-social-first/" rel="noopener">Meta announcement, Spanish edition</a>). The setting above is the simulated account's; nothing here says how your account is configured. Your ads' URL parameters are not visible publicly, so the UTM links in this data are an assumption too.</p>
   </div>
 </section>
 
@@ -156,6 +164,7 @@
         <li><strong>Pilot.</strong> A few ad sets under watch; issues fixed before anything wider.</li>
         <li><strong>Handover.</strong> Code in your repository, deployment notes, documentation.</li>
       </ol>
+      <p class="deps">The engine would be delivered in your repository, with no license or subscription on my side; recurring costs (hosting, model calls) would be quoted separately.</p>
       <p class="deps"><strong>Depends on</strong> a Meta system user with access to the ad account, a Shopify custom app with order and customer read scopes, your targets (new-customer cost, cost per purchase, the daily increase limit), and where you want approvals to land.</p>
     </div>
   </div>

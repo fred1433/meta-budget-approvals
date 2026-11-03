@@ -3,7 +3,7 @@
 // can reach graph.facebook.com.
 import { centsParam } from './money.js';
 
-export const API_VERSION = 'v25.0'; // Marketing API v25.0, released Feb 18, 2026 (Meta changelog, read Nov 3, 2026)
+export const API_VERSION = 'v26.0'; // Marketing API v26.0, released Jul 29, 2026 (Meta Marketing API changelog, read Nov 3, 2026)
 const READ_FIELDS = 'daily_budget,lifetime_budget,updated_time,effective_status';
 
 export function prepareRead(objectId) {

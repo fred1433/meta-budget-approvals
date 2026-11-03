@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reconcile, scene } from '../engine/reconcile.js';
+import { reconcile, scene, creditedChannel } from '../engine/reconcile.js';
 import { DATA } from '../engine/syntheticData.js';
 import { localDate } from '../engine/time.js';
 
@@ -32,4 +32,21 @@ test('the scene: click, email return, purchase, return dated on processing', () 
 test('Shopify net sales = gross - discounts - returns (taxes and shipping apart)', () => {
   const s = reconcile().shopify;
   assert.equal(s.netSales, s.gross - s.discounts - s.returns);
+});
+
+test('last non-direct click: Meta then direct stays Meta; Meta then email goes to email', () => {
+  assert.equal(creditedChannel({ first: { source: 'meta' }, last: { source: 'direct' } }), 'meta');
+  assert.equal(creditedChannel({ first: { source: 'meta' }, last: { source: 'email' } }), 'email');
+  assert.equal(creditedChannel({ first: { source: 'direct' }, last: { source: 'direct' } }), 'direct');
+  const viaDirect = DATA.orders.find((o) => o.journey.first.source === 'meta' && o.journey.last.source === 'direct');
+  assert.ok(viaDirect, 'the data contains a Meta-then-direct journey');
+});
+
+test('the Meta-then-direct orders are counted in what Shopify credits to Meta', () => {
+  const r = reconcile();
+  const w = DATA.scenario.week;
+  const expected = DATA.orders.filter((o) => { const d = localDate(Date.parse(o.created_utc)); return d >= w.from && d <= w.to && creditedChannel(o.journey) === 'meta'; }).length;
+  assert.equal(r.shopifyMeta.n, expected);
+  const lastOnly = DATA.orders.filter((o) => { const d = localDate(Date.parse(o.created_utc)); return d >= w.from && d <= w.to && o.journey.last.source === 'meta'; }).length;
+  assert.ok(r.shopifyMeta.n > lastOnly, 'direct last visits no longer take the credit from Meta');
 });

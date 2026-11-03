@@ -27,6 +27,9 @@ export function validateNote(note, verdict) {
     const toks = s.trim().split(/\s+/).slice(1);
     for (const tok of toks) if (/^[A-Z]/.test(tok.replace(/^["'(]/, ''))) problems.push(`capitalised word mid-sentence "${tok}"`);
   }
+  // Causal or over-confident conclusions a note may not draw on its own.
+  const OVERREACH = [/\bmostly buys\b/i, /\bis the limit\b/i, /\bis the auction\b/i, /\bnot (this|the) (video|ad|creative)\b/i, /\bis caused by\b/i, /\bdue to\b/i, /\bbecause of\b/i, /\bproves?\b/i, /\bguarantee/i, /\bwill (increase|grow|double|lift)\b/i];
+  for (const re of OVERREACH) if (re.test(t)) problems.push(`over-confident or causal claim (${re.source})`);
   if (t.length > 260) problems.push('longer than 260 characters');
   return { ok: problems.length === 0, problems };
 }

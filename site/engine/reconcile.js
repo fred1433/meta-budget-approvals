@@ -4,6 +4,12 @@ import { DATA } from './syntheticData.js';
 import { localDate } from './time.js';
 
 const inWeek = (ms, w) => { const d = localDate(ms); return d >= w.from && d <= w.to; };
+// Shopify-style last non-direct click: a direct visit never takes the credit from the last non-direct channel.
+export function creditedChannel(journey) {
+  if (journey.last.source !== 'direct') return journey.last.source;
+  if (journey.first.source !== 'direct') return journey.first.source;
+  return 'direct';
+}
 const net = (o) => o.lines.reduce((s, l) => s + l.price_cents * l.qty, 0) - o.discount_cents;
 
 export function reconcile(data = DATA) {
@@ -35,23 +41,23 @@ export function reconcile(data = DATA) {
     readAt: Date.parse(data.scenario.reads.shopify_orders_utc),
   };
   // Shopify's own attribution: last click from Meta, order dated on its creation.
-  const lastMeta = weekOrders.filter((o) => o.journey.last.source === 'meta');
-  const shopifyMeta = { n: lastMeta.length, value: sumV(lastMeta, net), readAt: Date.parse(data.scenario.reads.shopify_attribution_utc), model: 'last non-direct click (UTM)' };
+  const lastMeta = weekOrders.filter((o) => creditedChannel(o.journey) === 'meta');
+  const shopifyMeta = { n: lastMeta.length, value: sumV(lastMeta, net), readAt: Date.parse(data.scenario.reads.shopify_attribution_utc), model: 'last non-direct click (UTM)', note: 'order value credited to Meta, after discounts and before returns' };
 
   const gap = meta.total.value - shopifyMeta.value;
   // Explained from Meta's own breakdown: engage-through and view conversions have no Meta click to credit in Shopify.
   const viewEngage = meta.engage.value + meta.view.value;
   // Explained from Shopify journeys: a Meta click came first but another channel had the last click.
-  const otherLast = clickOrders.filter((o) => o.journey.last.source !== 'meta' && inWeek(Date.parse(o.created_utc), w));
+  const otherLast = clickOrders.filter((o) => creditedChannel(o.journey) !== 'meta' && inWeek(Date.parse(o.created_utc), w));
   // Explained by dates: click inside the week, order after it (Meta counts it, Shopify not this week) minus the reverse.
-  const clickInOrderAfter = clickOrders.filter((o) => o.journey.last.source === 'meta' && !inWeek(Date.parse(o.created_utc), w));
+  const clickInOrderAfter = clickOrders.filter((o) => creditedChannel(o.journey) === 'meta' && !inWeek(Date.parse(o.created_utc), w));
   const clickBeforeOrderIn = lastMeta.filter((o) => o.meta_click && !inWeek(Date.parse(o.meta_click.at), w));
   const dateShift = sumV(clickInOrderAfter, net) - sumV(clickBeforeOrderIn, net);
-  const otherLastValue = sumV(otherLast, net) + sumV(clickOrders.filter((o) => o.journey.last.source !== 'meta' && !inWeek(Date.parse(o.created_utc), w)), net);
+  const otherLastValue = sumV(otherLast, net) + sumV(clickOrders.filter((o) => creditedChannel(o.journey) !== 'meta' && !inWeek(Date.parse(o.created_utc), w)), net);
   const explained = viewEngage + otherLastValue + dateShift;
   const lines = [
-    { id: 'view_engage', status: 'explained', value: viewEngage, text: 'Engage-through and 1-day view purchases: Meta counts them, Shopify credits the last click to another channel', source: 'Meta breakdown by attribution window' },
-    { id: 'other_last_click', status: 'explained', value: otherLastValue, text: `Purchases after a Meta link click where email or a direct visit had the last click (${otherLast.length} this week)`, source: 'Shopify customer journeys' },
+    { id: 'view_engage', status: 'assumed', value: viewEngage, text: 'Engage-through and 1-day view purchases: Meta counts them; this scenario assumes Shopify credits them to another channel', source: 'Meta breakdown by attribution window' },
+    { id: 'other_last_click', status: 'explained', value: otherLastValue, text: `Purchases after a Meta link click where another non-direct channel (email) had the last click (${otherLast.length} this week)`, source: 'Shopify customer journeys' },
     { id: 'date_convention', status: 'explained', value: dateShift, text: 'Meta dates a purchase on the impression, Shopify on the order, so the week edges differ', source: 'Both readings, compared by date' },
     { id: 'unexplained', status: 'unexplained', value: gap - explained, text: 'Not matched to any order or journey. Possible causes include duplicated browser and server events; not confirmed', source: 'Remainder' },
   ];

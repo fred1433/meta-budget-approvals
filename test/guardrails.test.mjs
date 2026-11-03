@@ -101,9 +101,9 @@ test('going back is refused if someone edited the budget since', () => {
   const p = w.propose('SIM-AS-101');
   const a = w.executor.approve(p);
   w.executor.execute(a.id);
-  w.sim.humanEdit('SIM-AS-101', 12500);
   const back = w.executor.revertProposal(a.id);
   const b = w.executor.approve(back);
+  w.sim.humanEdit('SIM-AS-101', 12500);
   assert.equal(w.executor.execute(b.id).outcome, 'refused_state_changed');
   assert.equal(w.sim.objects['SIM-AS-101'].daily_budget_cents, 12500);
 });
@@ -122,4 +122,76 @@ test('the authorization names object, start value, absolute target, conditions a
   assert.equal(a.toCents, 11000);
   assert.ok(a.conditions.length >= 4);
   assert.equal(a.expiresAt - a.approvedAt, 30 * 60 * 1000);
+});
+
+// ---- fixes after review ----
+
+test('A-B-A: a person goes 100 -> 130 -> 100 after approval; the approval is void anyway', () => {
+  const w = createWorld();
+  const a = w.executor.approve(w.propose('SIM-AS-101'));
+  w.advance(30); w.sim.humanEdit('SIM-AS-101', 13000);
+  w.advance(30); w.sim.humanEdit('SIM-AS-101', 10000);
+  w.advance(5);
+  const r = w.executor.execute(a.id);
+  assert.equal(r.outcome, 'refused_state_changed');
+  assert.equal(r.editedSameValue, true);
+  assert.equal(w.sim.received.length, 0);
+});
+
+test('lost response, then a person resets 100: verify cannot conclude, no retry without a new approval', () => {
+  const w = createWorld();
+  const a = w.executor.approve(w.propose('SIM-AS-101'));
+  w.sim.faults.loseNextResponse = true;
+  assert.equal(w.executor.execute(a.id).outcome, 'unknown');
+  w.advance(60); w.sim.humanEdit('SIM-AS-101', 10000);
+  w.advance(10);
+  assert.equal(w.executor.verify(a.id).outcome, 'inconclusive');
+  assert.notEqual(w.executor.execute(a.id).outcome, 'executed');
+  assert.equal(w.sim.received.length, 1, 'still only the one lost request');
+  assert.equal(w.sim.objects['SIM-AS-101'].daily_budget_cents, 10000);
+});
+
+test('no new write to an ad set that has an unresolved request', () => {
+  const w = createWorld();
+  const p = w.propose('SIM-AS-101');
+  const a1 = w.executor.approve(p);
+  w.sim.faults.loseNextResponse = true;
+  w.executor.execute(a1.id);
+  const r = w.adapter.read('SIM-AS-101');
+  const p2 = { ...p, id: 'P-2', fromCents: r.dailyBudget, toCents: 12000, observedUpdatedMs: r.updatedMs };
+  const a2 = w.executor.approve(p2);
+  const out = w.executor.execute(a2.id);
+  assert.equal(out.outcome, 'blocked_unresolved');
+  assert.equal(out.blocking, a1.id);
+  assert.equal(w.sim.received.length, 1);
+});
+
+test('approving after a person edited the budget creates nothing; the recommendation must be recalculated', () => {
+  const w = createWorld();
+  const p = w.propose('SIM-AS-101');
+  w.advance(10); w.sim.humanEdit('SIM-AS-101', 13000);
+  assert.equal(w.executor.approve(p), null);
+  assert.equal(w.executor.auths.size, 0);
+  const again = w.propose('SIM-AS-101');
+  assert.equal(again.fromCents, 13000);
+  assert.equal(again.verdict, 'hold', 'edited minutes ago: no increase');
+});
+
+test('a second Run on a refused approval says it was already refused, without a made-up amount', () => {
+  const w = createWorld();
+  const a = w.executor.approve(w.propose('SIM-AS-101'));
+  w.sim.humanEdit('SIM-AS-101', 13000);
+  w.executor.execute(a.id);
+  const r = w.executor.execute(a.id);
+  assert.equal(r.outcome, 'already_closed');
+  assert.doesNotMatch(w.executor.journal.at(-1).text, /\$0\.00/);
+});
+
+test('held because data is too old is told apart from held because data is incomplete', () => {
+  const w = createWorld();
+  const a = w.executor.approve(w.propose('SIM-AS-101'));
+  w.status.metaReadMs -= 7 * 3600 * 1000;
+  const r = w.executor.execute(a.id);
+  assert.equal(r.tooOld, true);
+  assert.equal(r.incomplete, false);
 });
