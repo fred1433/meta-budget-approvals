@@ -1,0 +1,14 @@
+{
+  "name": "meta-budget-approvals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Approval-gated Meta budget changes, replayed on a local simulator with synthetic data.",
+  "scripts": {
+    "data": "node scripts/generate-data.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/",
+    "scenarios": "node scripts/scenarios.mjs"
+  },
+  "license": "MIT"
+}
